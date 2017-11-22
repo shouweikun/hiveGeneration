@@ -11,7 +11,9 @@ object TestrmBracket {
       "11(111)2222(22)23",
       "1234567",
       "dfdfde(r)g",
-      "d(favfwdfwgq(3r(gqw(fqwqwvqw","sdgfs)dbs"
+      "d(favfwdfwgq(3r(gqw(fqwqwvqw","sdgfs)dbs",
+    "fsd(fsd)fsdgsdg)sdvs",
+    "sdgbgef)bdf(bef(bwe)fdfwfwd(fvw"
     )
    val udf =  new rmBracket()
     test.map(x=>udf.evaluate(new Text(x)))
