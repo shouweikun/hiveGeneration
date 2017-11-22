@@ -3,53 +3,59 @@ package com.finup.nbsp.adp.HiveUDF.UDF
 import org.apache.hadoop.hive.ql.exec.UDF
 import org.apache.hadoop.io.Text
 
+import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
+
 /**
   * Created by john_liu on 2017/11/22.
   */
-class rmBracket extends UDF
-  {
-  val leftBrackets  = Set('(','（','（').map(_.toByte)
-  val rightBrackets = Set(')','）','）').map(_.toByte)
-  def evaluate(text:Text):Text = {
+class rmBracket extends UDF {
+  val leftBrackets = Set('(', '（', '（').map(_.toByte)
+  val rightBrackets = Set(')', '）', '）').map(_.toByte)
+  val brackets = leftBrackets ++ rightBrackets
 
-   val byteIndexArray = (0 until text.getLength).map(x=>(x,text.getBytes()(x)))
-   val theLeftBkts    = (byteIndexArray).filter(x=>leftBrackets.contains(x._2)).map(_._1).sortWith((x1,x2)=> x1<=x2)
-   val theRightBkts   = (byteIndexArray).filter(x=>rightBrackets.contains(x._2)).map(_._1).sortWith((x1,x2)=> x1<=x2)
+  def evaluate(text: Text): Text = {
 
-
-    def theFilterSet = {
-      (theLeftBkts zip theRightBkts)
-        .foldLeft((0 until text.getLength).toSet){
-          (set,upandDown)=>
-            val up   = upandDown._2
-            val down = upandDown._1
-            set.filter(x=>x<down||x>up)
-        }
-    }
-
-    (theLeftBkts.length-theRightBkts.length) match {
-      case _         =>{
-       val set         = theFilterSet
-       val newByteArray= byteIndexArray
-                         .filter(x=> set.contains(x._1))
-                         .map(_._2).toArray
-        println(new  String(newByteArray,"UTF-8"))
-        new Text(newByteArray)
+    // 所有字符构成的数组
+    val allByteArray= (0 until text.getLength)
+      .map(x => (x, text.getBytes()(x)))
+    //筛选出所有括号
+    val theBrackets = allByteArray
+      .filter(x => brackets.contains(x._2))
+    //初始化stack
+    val stack = new mutable.Stack[(Int, Byte)]
+    //记录被排除区间
+    val lb = ListBuffer.empty[(Int, Int)]
+    //利用栈匹配括号，被排除的区间记录在lb中
+    for (bracket <- theBrackets) {
+      if (leftBrackets.contains(bracket._2)) {
+        stack.push(bracket);
+      } else {
+        val left = stack.pop()
+        val right = bracket
+        val closedInterval = (left._1, right._1)
+        lb.append(closedInterval)
       }
-//    case 0         =>{
-//         theFilterSet
-//        }
-//    case diff if(diff>0) =>{
-//          //todo
-//        }
-//      case diff if(diff>0) =>{
-//        //todo
-//      }
-
-      }
-
-
     }
+    //
+    val filterSet = lb
+      .toList
+      .foldLeft((0 until text.getLength).toSet)((set,downUp)=>set.filter(x=>x<downUp._1||x>downUp._2))
+
+    val filterCondition = if(stack.isEmpty){
+      filterSet
+    }else{
+      if(leftBrackets.contains(stack.head._2)){
+        filterSet.filter(x=>x<stack.last._1)
+      }else{
+        filterSet.filter(x=>x>stack.head._1)
+      }
+    }
+    val newText = if(filterCondition.isEmpty)new Text("") else{
+      println(new String(allByteArray.filter(x=>filterCondition(x._1)).map(_._2).toArray))
+      new Text(allByteArray.filter(x=>filterCondition(x._1)).map(_._2).toArray)
+    }
+    newText
   }
 
-
+}
